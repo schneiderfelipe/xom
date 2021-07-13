@@ -1,4 +1,4 @@
-import macros, macroutils, xmltree, dom, tables
+import macros, macroutils, xmltree, dom, tables, strtabs
 
 var id {.compileTime.}: CountTable[char]
 
@@ -18,6 +18,11 @@ proc createTree*(x: XmlNode): NimNode =
       let n = createIdentFor(x)
       result = newStmtList superQuote do:
         let `n` = `result`
+
+      if not isNil(x.attrs):
+        for k, v in x.attrs:
+          result.add superQuote do:
+            `n`.setAttribute(`k`, `v`)
 
       for child in x:
         result.add superQuote do:

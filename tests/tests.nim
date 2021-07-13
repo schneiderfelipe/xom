@@ -57,3 +57,16 @@ suite "Text basics":
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
+
+
+suite "Attribute basics":
+  test "can create elements with attributes":
+    let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project.</a>"
+    check x.nodeName == "A"
+    check x.textContent == "Take a look at the project."
+    check document.body.childNodes[7] == x
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == x.textContent
+
+    check x.getAttribute("href") == "https://github.com/schneiderfelipe/xom"

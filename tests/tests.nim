@@ -68,14 +68,9 @@ suite "Text basics":
     check document.body.childNodes[7] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "We support HTML entities: "
+    check x.childNodes[0].textContent == "We support HTML entities: <, >, &, \"."
 
-    check x.childNodes[1].nodeName == "#text"
-    check x.childNodes[1].textContent == "<"
-
-    check len(x.childNodes) == 9
-    check x.childNodes[^1].nodeName == "#text"
-    check x.childNodes[^1].textContent == "."
+    check len(x.childNodes) == 1
 
 
 suite "Comment basics":
@@ -89,9 +84,9 @@ suite "Comment basics":
     check x.childNodes[0].textContent == "We support HTML comments, "
 
     check x.childNodes[1].nodeName == "#text"
-    check x.childNodes[1].textContent == " "
+    check x.childNodes[1].textContent == " but they are ignored (at "
 
-    check len(x.childNodes) == 5
+    check len(x.childNodes) == 4
     check x.childNodes[^1].nodeName == "#text"
     check x.childNodes[^1].textContent == ")."
 

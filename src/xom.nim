@@ -5,6 +5,9 @@ import dom, macros, macroutils, strformat, strtabs, strutils, tables, xmltree
 
 
 var id {.compileTime.}: CountTable[char]
+  ## Keep track of how many elements of each type were already generated.
+var buffer {.compileTime.}: string
+  ## Aglutinate text nodes before insertion.
 
 
 proc createIdentFor(x: XmlNode): auto {.compileTime.} =
@@ -35,6 +38,16 @@ func adjustText(s: string): string {.compileTime.} =
       result &= ' '
 
 
+proc flushBufferTo(stmts, n: NimNode) {.compileTime.} =
+  ## Flush the buffer by adding code to `result` to produce a text node
+  ## attached to `n` with the buffer contents.
+  if len(buffer) > 0:
+    stmts.add superQuote do:
+      `n`.appendChild(document.createTextNode(`adjustText(buffer)`))
+    buffer = ""
+    assert len(buffer) == 0
+
+
 proc createTree*(x: XmlNode): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
   ## structure as `x` by using DOM calls. HTML comments are ignored and, if
@@ -55,11 +68,17 @@ proc createTree*(x: XmlNode): NimNode {.compileTime.} =
             `n`.setAttribute(`key`, `value`)
 
       for xchild in x:
-        let nchild = createTree(xchild)
-        if nchild.kind != nnkNilLit:
-          result.add quote do:
-            `n`.appendChild(`nchild`)
+        if xchild.kind == xnText:
+          buffer &= xchild.text
+        else:
+          flushBufferTo(result, n)
+          let nchild = createTree(xchild)
+          if nchild.kind != nnkNilLit:
+            result.add quote do:
+              `n`.appendChild(`nchild`)
 
+      flushBufferTo(result, n)
+      # entryCallback(x, n)
       result.add n
   elif x.kind == xnText:
     result = superQuote do:

@@ -25,12 +25,15 @@ proc createTree*(x: XmlNode): NimNode =
             `n`.setAttribute(`k`, `v`)
 
       for child in x:
-        result.add superQuote do:
-          `n`.appendChild(`createTree(child)`)
+        if child.kind != xnComment:
+          result.add superQuote do:
+            `n`.appendChild(`createTree(child)`)
 
       result.add n
   elif x.kind == xnText:
     result = superQuote do:
       document.createTextNode(`x.text`)
+  elif x.kind == xnComment:
+    raise newException(ValueError, "XML comments are unsupported at the top level")
   else:
-    raise newException(ValueError, "unsupported XML node type: " & $x.kind)
+    raise newException(ValueError, "unsupported XML node type: '" & $x.kind & "'")

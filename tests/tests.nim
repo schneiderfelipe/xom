@@ -75,12 +75,33 @@ suite "Text basics":
     check x.childNodes[^1].textContent == "."
 
 
+suite "Comment basics":
+  test "can create elements containing text and ignored comments":
+    let x = document.body.appendChildAndReturn html"<p>We support HTML comments, <!-- not sure if it can be called 'support' then --> but they are ignored (at <strong>compile-time</strong>).</p>"
+    check x.nodeName == "P"
+    check x.textContent == "We support HTML comments,  but they are ignored (at compile-time)."
+    check document.body.childNodes[8] == x
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == "We support HTML comments, "
+
+    check x.childNodes[1].nodeName == "#text"
+    check x.childNodes[1].textContent == " "
+
+    check len(x.childNodes) == 5
+    check x.childNodes[^1].nodeName == "#text"
+    check x.childNodes[^1].textContent == ")."
+
+  test "comments are unsupported at the top level":
+    check not compiles html"<!-- ceci n'est pas un commentaire ⚗️ -->"
+
+
 suite "Attribute basics":
   test "can create elements with attributes":
     let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a>"
     check x.nodeName == "A"
     check x.textContent == "Take a look at the project for more."
-    check document.body.childNodes[8] == x
+    check document.body.childNodes[9] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent

@@ -4,9 +4,12 @@ import xom
 
 import dom, htmlparser, macros, sequtils, strutils, sugar
 
+
 macro html(s: string{lit}): auto =
   ## Helper for HTML parsing.
-  parseHtml(s.strVal).createTree()
+  result = parseHtml(s.strVal).createTree()
+  if result.kind == nnkNilLit:
+    raise newException(ValueError, "pure XML comments or whitespace found")
 
 
 func appendChildAndReturn(parent, child: Node): Node =
@@ -109,7 +112,7 @@ suite "Attribute basics":
 
 
 suite "Real world cases":
-  test "can create bad, complex trees":
+  test "can create mean, complex trees":
     let x = document.body.appendChildAndReturn html"""
       <h2>Show case</h2>
       <p>Favorite fruits:</p>
@@ -125,7 +128,7 @@ suite "Real world cases":
     check document.body.childNodes[10] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "      "
+    check x.childNodes[0].textContent == " "
 
     check x.childNodes[1].nodeName == "H2"
     check x.childNodes[1].textContent == "Show case"

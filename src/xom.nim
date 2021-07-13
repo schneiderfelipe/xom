@@ -1,4 +1,4 @@
-import dom, macros, macroutils, strtabs, tables, xmltree
+import dom, macros, macroutils, strtabs, strutils, tables, xmltree
 
 
 var id {.compileTime.}: CountTable[char]
@@ -27,16 +27,20 @@ proc createTree*(x: XmlNode): NimNode =
           result.add superQuote do:
             `n`.setAttribute(`k`, `v`)
 
-      for child in x:
-        if child.kind != xnComment:
+      for xc in x:
+        let nc = createTree(xc)
+        if nc.kind != nnkNilLit:
           result.add superQuote do:
-            `n`.appendChild(`createTree(child)`)
+            `n`.appendChild(`nc`)
 
       result.add n
   elif x.kind == xnText:
+    var nt = x.text
+    if nt.isEmptyOrWhitespace:
+      nt = " "
     result = superQuote do:
-      document.createTextNode(`x.text`)
+      document.createTextNode(`nt`)
   elif x.kind == xnComment:
-    raise newException(ValueError, "XML comments are unsupported at the top level")
+    discard
   else:
     raise newException(ValueError, "unsupported XML node type: '" & $x.kind & "'")

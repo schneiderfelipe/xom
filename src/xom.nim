@@ -20,9 +20,19 @@ func adjustText(s: string): string {.compileTime.} =
   ## Remove whitespace as much as possible, hopefully not breaking anything.
   ## Basically, contigous whitespace is transformed into single `' '`
   ## characters.
-  for i in low(s)..high(s):
-    if not (s[i].isSpaceAscii and i > 0 and s[i-1].isSpaceAscii):
+  let start = low(s)
+
+  if len(s) > 0:
+    if not s[start].isSpaceAscii:
+      result &= s[start]
+    else:
+      result &= ' '
+
+  for i in start+1..high(s):
+    if not s[i].isSpaceAscii:
       result &= s[i]
+    elif not s[i-1].isSpaceAscii:
+      result &= ' '
 
 
 proc createTree*(x: XmlNode): NimNode {.compileTime.} =
@@ -41,12 +51,14 @@ proc createTree*(x: XmlNode): NimNode {.compileTime.} =
 
       if not isNil(x.attrs):
         for key, value in x.attrs:
-          result.add newCall(ident"setAttribute", n, key, value)
+          result.add quote do:
+            `n`.setAttribute(`key`, `value`)
 
       for xchild in x:
         let nchild = createTree(xchild)
         if nchild.kind != nnkNilLit:
-          result.add newCall(ident"appendChild", n, nchild)
+          result.add quote do:
+            `n`.appendChild(`nchild`)
 
       result.add n
   elif x.kind == xnText:

@@ -2,7 +2,7 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, sequtils, strutils, sugar
+import dom, htmlparser, macros, sequtils, strformat, strutils, sugar
 
 
 macro html(s: string{lit}): auto =
@@ -10,6 +10,7 @@ macro html(s: string{lit}): auto =
   result = parseHtml(s.strVal).createTree()
   if result.kind == nnkNilLit:
     raise newException(ValueError, "pure XML comments or whitespace found")
+  debugEcho &"\n\n<!-- The generated code for \"{s.strVal}\": -->\n{repr result}"
 
 
 func appendChildAndReturn(parent, child: Node): Node =

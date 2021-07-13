@@ -7,7 +7,7 @@ import dom, htmlparser, macros, sequtils, strformat, strutils, sugar
 
 macro html(s: string{lit}): auto =
   ## Helper for HTML parsing.
-  result = parseHtml(s.strVal).createTree()
+  result = parseHtml(s.strVal).initXom()
   if result.kind == nnkNilLit:
     raise newException(ValueError, "pure XML comments or whitespace found")
   debugEcho &"\n\n<!-- The generated code for \"{s.strVal}\": -->\n{repr result}"

@@ -4,25 +4,23 @@ when not defined(js) and not defined(Nimdoc):
 import dom, macros, macroutils, strformat, strtabs, strutils, tables, xmltree
 
 
-var id {.compileTime.}: CountTable[char]
-  ## Keep track of how many elements of each type were already generated.
-var buffer {.compileTime.}: string
-  ## Aglutinate text nodes before insertion.
+type Xom = ref object
+  ## An object holding context for a conversion between `XmlNode` and
+  ## `NimNode`.
+  tree: XmlNode ## The XML represented by the object.
+  id: CountTable[char] ## Keep track of how many elements of each type were already generated.
+  buffer: string ## Buffer used during aglutination of text nodes.
 
 
-proc createIdentFor(x: XmlNode): auto {.compileTime.} =
-  ## Create a cute unique identifier for the node in the form `"<char><id>"`,
-  ## where "`<char>`" is the first letter of the tag name and "`<id>`" is a an
-  ## increasing number starting at zero.
-  let c = x.tag[0]
-  result = ident(&"{c}{id[c]}")
-  id.inc(c)
+func initXom*(x: XmlNode): Xom {.compileTime.} =
+  ## Initialize a `Xom` object with a `XmlNode`.
+  Xom(tree: x)
 
 
 func adjustText(s: string): string {.compileTime.} =
-  ## Remove whitespace as much as possible, hopefully not breaking anything.
-  ## Basically, contigous whitespace is transformed into single `' '`
-  ## characters.
+  ## Remove whitespace from `s` as much as possible, hopefully not breaking
+  ## any HTML rule. Basically, contigous whitespace is transformed into
+  ## single `' '` characters.
   let start = low(s)
 
   if len(s) > 0:
@@ -38,26 +36,37 @@ func adjustText(s: string): string {.compileTime.} =
       result &= ' '
 
 
-proc flushBufferTo(stmts, n: NimNode) {.compileTime.} =
-  ## Flush the buffer by adding code to `result` to produce a text node
-  ## attached to `n` with the buffer contents.
-  if len(buffer) > 0:
+func flushBufferTo(stmts, n: NimNode, q: Xom) {.compileTime.} =
+  ## Flush the buffer of a `Xom` object by adding code to `result` to produce
+  ## a text node attached to `n` with the buffer contents. Do nothing if the
+  ## buffer is empty.
+  if len(q.buffer) > 0:
     stmts.add superQuote do:
-      `n`.appendChild(document.createTextNode(`adjustText(buffer)`))
-    buffer = ""
-    assert len(buffer) == 0
+      `n`.appendChild(document.createTextNode(`adjustText(q.buffer)`))
+    q.buffer = ""
+    assert len(q.buffer) == 0
 
 
-proc createTree*(x: XmlNode): NimNode {.compileTime.} =
+func createIdentFor(x: XmlNode, q: Xom): auto {.compileTime.} =
+  ## Create a cute unique identifier for an XML node in the form
+  ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
+  ## "`<id>`" is a an increasing number starting at zero.
+  let c = x.tag[0]
+  result = ident(&"{c}{q.id[c]}")
+  q.id.inc(c)
+
+
+func toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
-  ## structure as `x` by using DOM calls. HTML comments are ignored and, if
-  ## the whole tree is ignored, a `NimNode` representing `nil` is returned.
+  ## structure as `x` by using DOM calls, and use the context of the `Xom`
+  ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
+  ## a `NimNode` representing `nil` is returned.
   if x.kind == xnElement:
     result = superQuote do:
       document.createElement(`x.tag`)
 
     if len(x) > 0 or attrsLen(x) > 0: # or forceEntry(x):
-      let n = createIdentFor(x)
+      let n = createIdentFor(x, q)
 
       result = newStmtList quote do:
         let `n` = `result`
@@ -69,15 +78,15 @@ proc createTree*(x: XmlNode): NimNode {.compileTime.} =
 
       for xchild in x:
         if xchild.kind == xnText:
-          buffer &= xchild.text
+          q.buffer &= xchild.text
         else:
-          flushBufferTo(result, n)
-          let nchild = createTree(xchild)
+          flushBufferTo(result, n, q)
+          let nchild = toNimNodeImpl(xchild, q)
           if nchild.kind != nnkNilLit:
             result.add quote do:
               `n`.appendChild(`nchild`)
 
-      flushBufferTo(result, n)
+      flushBufferTo(result, n, q)
       # entryCallback(x, n)
       result.add n
   elif x.kind == xnText:
@@ -87,3 +96,11 @@ proc createTree*(x: XmlNode): NimNode {.compileTime.} =
     discard
   else:
     raise newException(ValueError, &"unsupported XML node type: '{x.kind}'")
+
+
+converter toNimNode*(x: Xom): NimNode {.compileTime.} =
+  ## Convert a `Xom` object to a `NimNode`. This converter constructs an HTML
+  ## element with the same structure as `x` by using DOM calls. HTML comments
+  ## are ignored and, if the whole tree is ignored, a `NimNode` representing
+  ## `nil` is returned.
+  toNimNodeImpl(x.tree, x)

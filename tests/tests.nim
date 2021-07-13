@@ -28,3 +28,27 @@ suite "Basics":
     check x.nodeName == "H1"
     check x.textContent == ""
     check document.body.childNodes[3] == x
+
+  test "can create elements containing text":
+    let x = document.body.appendChildAndReturn html"<h1>Hello, world!</h1>"
+    check x.nodeName == "H1"
+    check x.textContent == "Hello, world!"
+    check document.body.childNodes[4] == x
+
+  test "can create elements containing distinct elements":
+    let x = document.body.appendChildAndReturn html"<h1><a>Hello, world!</a></h1>"
+    check x.nodeName == "H1"
+    check x.textContent == "Hello, world!"
+    check document.body.childNodes[5] == x
+
+    check x.childNodes[0].nodeName == "A"
+    check x.childNodes[0].textContent == "Hello, world!"
+
+  test "can create elements containing similar elements":
+    let x = document.body.appendChildAndReturn html"<div><div>Hello, world!</div></div>"
+    check x.nodeName == "DIV"
+    check x.textContent == "Hello, world!"
+    check document.body.childNodes[6] == x
+
+    check x.childNodes[0].nodeName == "DIV"
+    check x.childNodes[0].textContent == "Hello, world!"

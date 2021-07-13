@@ -1,10 +1,14 @@
-import macros, macroutils, xmltree, dom
+import macros, macroutils, xmltree, dom, tables
 
-var id {.compileTime.} = 0
+var id {.compileTime.}: CountTable[char]
 
 proc createIdentFor(x: XmlNode): NimNode =
-  result = ident(x.tag[0] & $id)
-  id += 1
+  ## Create a cute unique identifier for the node in the form `"<char><id>"`,
+  ## where "`<char>`" is the first letter of the tag name and "`<id>`" is a an
+  ## increasing number starting at zero.
+  let c = x.tag[0]
+  result = ident(c & $id[c])
+  id.inc(c)
 
 proc createTree*(x: XmlNode): NimNode =
   if x.kind == xnElement:

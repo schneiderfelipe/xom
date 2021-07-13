@@ -33,9 +33,9 @@ suite "Element basics":
     check x.childNodes[0].textContent == x.textContent
 
   test "can create elements containing similar elements":
-    let x = document.body.appendChildAndReturn html"<div><div>This is xom, a Nim library that converts XmlNodes into DOM calls at compile-time.</div></div>"
+    let x = document.body.appendChildAndReturn html"<div><div>This is xom, a Nim library that converts XmlNodes into DOM calls at compile-time & is awesome!</div></div>"
     check x.nodeName == "DIV"
-    check x.textContent == "This is xom, a Nim library that converts XmlNodes into DOM calls at compile-time."
+    check x.textContent == "This is xom, a Nim library that converts XmlNodes into DOM calls at compile-time & is awesome!"
     check document.body.childNodes[4] == x
 
     check x.childNodes[0].nodeName == "DIV"
@@ -58,13 +58,29 @@ suite "Text basics":
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
 
+  test "can create elements containing text with entities":
+    let x = document.body.appendChildAndReturn html"<p>We support HTML entities: &lt;, &gt;, &amp;, &quot;.</p>"
+    check x.nodeName == "P"
+    check x.textContent == "We support HTML entities: <, >, &, \"."
+    check document.body.childNodes[7] == x
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == "We support HTML entities: "
+
+    check x.childNodes[1].nodeName == "#text"
+    check x.childNodes[1].textContent == "<"
+
+    check len(x.childNodes) == 9
+    check x.childNodes[^1].nodeName == "#text"
+    check x.childNodes[^1].textContent == "."
+
 
 suite "Attribute basics":
   test "can create elements with attributes":
-    let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project.</a>"
+    let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a>"
     check x.nodeName == "A"
-    check x.textContent == "Take a look at the project."
-    check document.body.childNodes[7] == x
+    check x.textContent == "Take a look at the project for more."
+    check document.body.childNodes[8] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent

@@ -14,7 +14,7 @@ proc createTree*(x: XmlNode): NimNode =
   if x.kind == xnElement:
     result = superQuote do:
       document.createElement(`x.tag`)
-    if len(x) > 0 or attrsLen(x) > 0:  # or forceEntry(x):
+    if len(x) > 0 or attrsLen(x) > 0: # or forceEntry(x):
       let n = createIdentFor(x)
       result = newStmtList superQuote do:
         let `n` = `result`

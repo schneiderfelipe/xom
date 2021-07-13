@@ -2,8 +2,7 @@ import unittest
 
 import xom
 
-import macros, htmlparser, dom
-
+import dom, htmlparser, macros, sequtils, strutils, sugar
 
 macro html(s: string{lit}): auto =
   ## Helper for HTML parsing.
@@ -107,3 +106,30 @@ suite "Attribute basics":
     check x.childNodes[0].textContent == x.textContent
 
     check x.getAttribute("href") == "https://github.com/schneiderfelipe/xom"
+
+
+suite "Real world cases":
+  test "can create bad, complex trees":
+    let x = document.body.appendChildAndReturn html"""
+      <h2>Show case</h2>
+      <p>Favorite fruits:</p>
+      <ul class='fruits list'>
+        <li><a href="https://en.wikipedia.org/wiki/Pineapple"><img src='https://upload.wikimedia.org/wikipedia/commons/thumb/7/74/%E0%B4%95%E0%B5%88%E0%B4%A4%E0%B4%9A%E0%B5%8D%E0%B4%9A%E0%B4%95%E0%B5%8D%E0%B4%95.jpg/320px-%E0%B4%95%E0%B5%88%E0%B4%A4%E0%B4%9A%E0%B5%8D%E0%B4%9A%E0%B4%95%E0%B5%8D%E0%B4%95.jpg' WIDTH=150></a>
+        <!-- '&' has to be escaped below, I don't know why: -->
+        <li><a href='https://gn.wikipedia.org/wiki/Arasa'><img alt="delicious &amp; tasty!" src='https://upload.wikimedia.org/wikipedia/commons/thumb/0/02/Guava_ID.jpg/320px-Guava_ID.jpg' WIDTH='150' /></a> <emph><STRONG>(most loved!)</STRONG>
+        <li><a href=https://pt.wikipedia.org/wiki/Mam%C3%A3o><img WIDTH="150" src=https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/Mam%C3%A3o_papaia_em_fundo_preto.jpg/320px-Mam%C3%A3o_papaia_em_fundo_preto.jpg></a>
+      </ul>
+    """
+    check x.nodeName == "DOCUMENT"
+    check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
+    check document.body.childNodes[10] == x
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == "      "
+
+    check x.childNodes[1].nodeName == "H2"
+    check x.childNodes[1].textContent == "Show case"
+
+    check len(x.childNodes) == 6
+    check x.childNodes[^1].nodeName == "UL"
+    check ($x.childNodes[^1].textContent).filter(c => not isSpaceAscii(c)) == @"(mostloved!)"

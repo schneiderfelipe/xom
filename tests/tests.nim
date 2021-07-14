@@ -2,7 +2,7 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, sequtils, strformat, strtabs, strutils, sugar, xmltree
+import dom, htmlparser, macros, sequtils, strformat, strutils, sugar, xmltree
 
 
 func avoidNilandPrint(context: NimNode, code: string): NimNode =
@@ -75,7 +75,7 @@ suite "Text basics":
     check document.body.childNodes[7] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "HTML entities: <, >, &, \"."
+    check x.childNodes[0].textContent == x.textContent
 
     check len(x.childNodes) == 1
 
@@ -101,7 +101,7 @@ suite "Comment basics":
     check not compiles html"<!-- ceci n'est pas un commentaire ⚗️ -->"
 
 
-suite "Control basics":
+suite "Advanced control":
   test "can insert elements on creation or avoid creation":
     macro html2(s: string{lit}): auto =
       let
@@ -168,17 +168,51 @@ suite "Control basics":
     check x.childNodes[^1].textContent == "."
 
 
-suite "Attribute basics":
-  test "can create elements with attributes":
-    let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a>"
-    check x.nodeName == "A"
-    check x.textContent == "Take a look at the project for more."
+  test "can modify or ignore text nodes on creation":
+    macro html2(s: string{lit}): auto =
+      let
+        code = s.strVal
+        context = parseHtml(code).initXom()
+      context.onCreateTextNode = proc(x: XmlNode): bool =
+        if "fnord" in x.text:
+          false
+        else:
+          x.text = x.text.replace("XXX", "modifying text nodes")
+          true
+      avoidNilandPrint(context, code)
+
+    let x = document.body.appendChildAndReturn html2"<p>Callbacks for XXX.<span>fnord</span></p>"
+    check x.nodeName == "P"
+    check x.textContent == "Callbacks for modifying text nodes."
     check document.body.childNodes[11] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
 
-    check x.getAttribute("href") == "https://github.com/schneiderfelipe/xom"
+    check len(x.childNodes) == 2
+    check x.childNodes[^1].nodeName == "SPAN"
+    check x.childNodes[^1].textContent == ""
+
+    let y = document.body.appendChildAndReturn html2"(XXX work even at the top level.)"
+    check y.nodeName == "#text"
+    check y.textContent == "(modifying text nodes work even at the top level.)"
+    check document.body.childNodes[12] == y
+
+
+suite "Attribute basics":
+  test "can create elements with attributes":
+    let x = document.body.appendChildAndReturn html"<p><a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a></p>"
+    check x.nodeName == "P"
+    check x.textContent == "Take a look at the project for more."
+    check document.body.childNodes[13] == x
+
+    check x.childNodes[0].nodeName == "A"
+    check x.childNodes[0].textContent == x.textContent
+
+    check x.childNodes[0].childNodes[0].nodeName == "#text"
+    check x.childNodes[0].childNodes[0].textContent == x.textContent
+
+    check x.childNodes[0].getAttribute("href") == "https://github.com/schneiderfelipe/xom"
 
 
 suite "Real world cases":
@@ -195,7 +229,7 @@ suite "Real world cases":
     """
     check x.nodeName == "DOCUMENT"
     check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
-    check document.body.childNodes[12] == x
+    check document.body.childNodes[14] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == " "

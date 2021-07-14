@@ -18,6 +18,8 @@ type Xom = ref object
   onSetAttribute*: XmlNode -> bool
     ## Callback called when code with `setAttribute` is generated. If `false`
     ## is returned, all attributes are ignored.
+  onCreateTextNode*: XmlNode -> bool
+    ## Callback called when code with `createTextNode` is generated.
 
 
 # forceEntry(x)
@@ -31,6 +33,7 @@ func initXom*(x: XmlNode): Xom {.compileTime.} =
   result = Xom(tree: x)
   result.onCreateElement = defaultCallback
   result.onSetAttribute = defaultCallback
+  result.onCreateTextNode = defaultCallback
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -95,7 +98,7 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
               `n`.setAttribute(`key`, `value`)
 
         for xchild in x:
-          if xchild.kind == xnText:
+          if xchild.kind == xnText and q.onCreateTextNode(xchild):
             q.buffer &= xchild.text
           else:
             flushBufferTo(result, n, q)
@@ -107,8 +110,9 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
         flushBufferTo(result, n, q)
         result.add n
   of xnText:
-    result = superQuote do:
-      document.createTextNode(`adjustText(x.text)`)
+    if q.onCreateTextNode(x):
+      result = superQuote do:
+        document.createTextNode(`adjustText(x.text)`)
   of xnComment:
     discard
   else:

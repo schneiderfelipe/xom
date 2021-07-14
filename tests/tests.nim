@@ -118,7 +118,7 @@ suite "Control basics":
           true
       avoidNilandPrint(context, code)
 
-    let x = document.body.appendChildAndReturn html2"""<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"""
+    let x = document.body.appendChildAndReturn html2"<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"
     check x.nodeName == "P"
     check x.textContent == "Callbacks for modifying elements when created."
     check document.body.childNodes[9] == x
@@ -133,13 +133,47 @@ suite "Control basics":
     check x.childNodes[^1].nodeName == "#text"
     check x.childNodes[^1].textContent == " when created."
 
+  test "can modify or ignore attributes on being set":
+    macro html2(s: string{lit}): auto =
+      let
+        code = s.strVal
+        context = parseHtml(code).initXom()
+      context.onSetAttribute = proc(x: XmlNode): bool =
+        case x.tag
+        of "p":
+          false
+        of "span":
+          x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
+          true
+        else:
+          true
+      avoidNilandPrint(context, code)
+
+    let x = document.body.appendChildAndReturn html2"<p id=remove-this>Callbacks for <span class=italic>modifying attributes</span>.</p>"
+    check x.nodeName == "P"
+    check x.textContent == "Callbacks for modifying attributes."
+    check document.body.childNodes[10] == x
+    check not x.hasAttribute("id")
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == "Callbacks for "
+
+    check x.childNodes[1].nodeName == "SPAN"
+    check x.childNodes[1].textContent == "modifying attributes"
+    check x.childNodes[1].getAttribute("style") == "font-style: italic;"
+    check not x.childNodes[1].hasAttribute("class")
+
+    check len(x.childNodes) == 3
+    check x.childNodes[^1].nodeName == "#text"
+    check x.childNodes[^1].textContent == "."
+
 
 suite "Attribute basics":
   test "can create elements with attributes":
     let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a>"
     check x.nodeName == "A"
     check x.textContent == "Take a look at the project for more."
-    check document.body.childNodes[10] == x
+    check document.body.childNodes[11] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
@@ -161,7 +195,7 @@ suite "Real world cases":
     """
     check x.nodeName == "DOCUMENT"
     check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
-    check document.body.childNodes[11] == x
+    check document.body.childNodes[12] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == " "

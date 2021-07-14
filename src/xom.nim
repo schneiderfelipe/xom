@@ -15,12 +15,22 @@ type Xom = ref object
   buffer: string ## Buffer used during aglutination of text nodes.
   onCreateElement*: XmlNode -> bool
     ## Callback called when code with `createElement` is generated.
+  onSetAttribute*: XmlNode -> bool
+    ## Callback called when code with `setAttribute` is generated. If `false`
+    ## is returned, all attributes are ignored.
+
+
+# forceEntry(x)
+func defaultCallback(_: XmlNode): bool =
+  ## Default behavior of all callbacks.
+  true
 
 
 func initXom*(x: XmlNode): Xom {.compileTime.} =
   ## Initialize a `Xom` object with a `XmlNode`.
   result = Xom(tree: x)
-  result.onCreateElement = (_: XmlNode) => true
+  result.onCreateElement = defaultCallback
+  result.onSetAttribute = defaultCallback
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -67,7 +77,8 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
   ## structure as `x` by using DOM calls, and use the context of the `Xom`
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
   ## a `NimNode` representing `nil` is returned.
-  if x.kind == xnElement:
+  case x.kind:
+  of xnElement:
     if q.onCreateElement(x):
       result = superQuote do:
         document.createElement(`x.tag`)
@@ -78,7 +89,7 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
         result = newStmtList quote do:
           let `n` = `result`
 
-        if not isNil(x.attrs):
+        if q.onSetAttribute(x) and not isNil(x.attrs):
           for key, value in x.attrs:
             result.add quote do:
               `n`.setAttribute(`key`, `value`)
@@ -95,10 +106,10 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
 
         flushBufferTo(result, n, q)
         result.add n
-  elif x.kind == xnText:
+  of xnText:
     result = superQuote do:
       document.createTextNode(`adjustText(x.text)`)
-  elif x.kind == xnComment:
+  of xnComment:
     discard
   else:
     raise newException(ValueError, &"unsupported XML node type: '{x.kind}'")

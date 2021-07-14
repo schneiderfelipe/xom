@@ -9,8 +9,8 @@ case. You can modify nodes in-place, suppress code generation for certain
 nodes, force creation of referencing variables to certain nodes, and more.
 
 This customization of the behavior is performed by the use of two callbacks:
-- `onEnter(x: XmlNode): Command`
-- `onEmitCode(x: XmlNode, name: string = ""): Command`
+- `onEnter(node: XmlNode): Command`
+- `onEmitCode(node: XmlNode, name: string = ""): Command`
 
 `onEnter` is called when a new node is found, and `onEmitCode` when code
 for a node is emitted (i.e., with `createElement` or `createTextNode` and
@@ -23,8 +23,9 @@ Inside callbacks, you can modify nodes as much as you want.
 - `EmitNamed`: emit code to create the node, and also create a variable for
 it.
 
-**Note:** `EmitNamed` can only be returned from `onEnter`: returning
-`EmitNamed` from `onEmitCode` results in a compile-time `ValueError`.
+**Note**: `EmitNamed` can only be (meaningfully) returned from `onEnter`:
+returning `EmitNamed` from `onEmitCode` means the same as `Emit`, since the
+decision to create a variable has already been made at that point.
 
 The default implementation of both `onEnter` and `onEmitCode` is as follows:
 

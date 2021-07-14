@@ -5,35 +5,48 @@ import dom, macros, macroutils, strformat, strtabs, strutils, sugar,
     tables, xmltree
 
 
-type Xom = ref object
-  ## An object holding context for a conversion between `XmlNode` and
-  ## `NimNode`. It accepts some callbacks, which serve as transformers: a
-  ## `bool` returned by them specifies whether code should be generated, and
-  ## the given object can be modified prior to this generation.
-  tree: XmlNode ## The XML represented by the object.
-  id: CountTable[char] ## Keep track of how many elements of each type were already generated.
-  buffer: string ## Buffer used during aglutination of text nodes.
-  onCreateElement*: XmlNode -> bool
-    ## Callback called when code with `createElement` is generated.
-  onSetAttribute*: XmlNode -> bool
-    ## Callback called when code with `setAttribute` is generated. If `false`
-    ## is returned, all attributes are ignored.
-  onCreateTextNode*: XmlNode -> bool
-    ## Callback called when code with `createTextNode` is generated.
+type
+  Command* = enum
+    ## Return type for callbacks.
+    Emit,      ## Emit code to create the node (default behavior).
+    EmitNamed, ## emit code to create the node, and also create a variable
+               ## for it.
+    Discard,   ## Discard the node and its children and don't emit any code.
 
-
-# forceEntry(x)
-func defaultCallback(_: XmlNode): bool =
-  ## Default behavior of all callbacks.
-  true
+  Xom = ref object
+    ## An object holding context for a conversion between `XmlNode` and
+    ## `NimNode`. It accepts some callbacks, which serve as transformers,
+    ## since the given object can be modified prior to this generation.
+    tree: XmlNode ## The XML represented by the object.
+    id: CountTable[char] ## Keep track of how many elements of each type were already generated.
+    buffer: string ## Buffer used during aglutination of text nodes.
+    onEnter*: XmlNode -> Command
+      ## Callback called when a new node is found. It receives the node as
+      ## a parameter, and returns a command to be performed on it. The default
+      ## behavior is to emit code to create the node. The command can be
+      ## `Emit`, `EmitNamed`, or `Discard`. The `Emit` command will emit
+      ## code to create the node, and the `EmitNamed` command will emit code
+      ## to create the node, and also create a variable for it. The `Discard`
+      ## command will not emit any code, and the node will be discarded.
+    onEmitCode: (XmlNode, string) -> Command
+      ## Callback called when code for a node is emitted (i.e., with
+      ## `createElement` or `createTextNode` and eventually later
+      ## `setAttribute` and `appendChild`). It receives the node as a
+      ## parameter, and returns a command to be performed on it. The default
+      ## behavior is to emit code to create the node. The command can be
+      ## `Emit`, `EmitNamed`, or `Discard`. Both `Emit` and `EmitNamed`
+      ## commands will emit code to create the node. The `Discard` command
+      ## will not emit any code, and the node will be discarded.
 
 
 func initXom*(x: XmlNode): Xom {.compileTime.} =
-  ## Initialize a `Xom` object with a `XmlNode`.
+  ## Initialize a `Xom` object with a `XmlNode`. Default behavior of all
+  ## callbacks is to emit code to create nodes.
   result = Xom(tree: x)
-  result.onCreateElement = defaultCallback
-  result.onSetAttribute = defaultCallback
-  result.onCreateTextNode = defaultCallback
+  result.onEnter = func(node: XmlNode): Command =
+    Emit
+  result.onEmitCode = func(node: XmlNode, name: string = ""): Command =
+    Emit
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -81,38 +94,44 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
   ## a `NimNode` representing `nil` is returned.
   case x.kind:
+  of xnElement, xnText:
+    let command = q.onEnter(x)
+    if command == Discard:
+      return
+  else:
+    discard
+
+  case x.kind:
   of xnElement:
-    if q.onCreateElement(x):
-      result = superQuote do:
-        document.createElement(`x.tag`)
+    result = superQuote do:
+      document.createElement(`x.tag`)
 
-      if len(x) > 0 or attrsLen(x) > 0:
-        let n = createIdentFor(x, q)
+    if len(x) > 0 or attrsLen(x) > 0:
+      let n = createIdentFor(x, q)
 
-        result = newStmtList quote do:
-          let `n` = `result`
+      result = newStmtList quote do:
+        let `n` = `result`
 
-        if q.onSetAttribute(x) and not isNil(x.attrs):
-          for key, value in x.attrs:
+      if not isNil(x.attrs):
+        for key, value in x.attrs:
+          result.add quote do:
+            `n`.setAttribute(`key`, `value`)
+
+      for xchild in x:
+        if xchild.kind == xnText:
+          q.buffer &= xchild.text
+        else:
+          flushBufferTo(result, n, q)
+          let nchild = toNimNodeImpl(xchild, q)
+          if nchild.kind != nnkNilLit:
             result.add quote do:
-              `n`.setAttribute(`key`, `value`)
+              `n`.appendChild(`nchild`)
 
-        for xchild in x:
-          if xchild.kind == xnText and q.onCreateTextNode(xchild):
-            q.buffer &= xchild.text
-          else:
-            flushBufferTo(result, n, q)
-            let nchild = toNimNodeImpl(xchild, q)
-            if nchild.kind != nnkNilLit:
-              result.add quote do:
-                `n`.appendChild(`nchild`)
-
-        flushBufferTo(result, n, q)
-        result.add n
+      flushBufferTo(result, n, q)
+      result.add n
   of xnText:
-    if q.onCreateTextNode(x):
-      result = superQuote do:
-        document.createTextNode(`adjustText(x.text)`)
+    result = superQuote do:
+      document.createTextNode(`adjustText(x.text)`)
   of xnComment:
     discard
   else:

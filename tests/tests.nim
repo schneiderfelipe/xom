@@ -107,15 +107,15 @@ suite "Advanced control":
       let
         code = s.strVal
         context = parseHtml(code).initXom()
-      context.onCreateElement = proc(x: XmlNode): bool =
+      context.onEnter = proc(x: XmlNode): Command =
         case x.tag
         of "p":
           x.add newText(" when created.")
-          true
+          Emit
         of "span":
-          false
+          Discard
         else:
-          true
+          Emit
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"
@@ -138,15 +138,15 @@ suite "Advanced control":
       let
         code = s.strVal
         context = parseHtml(code).initXom()
-      context.onSetAttribute = proc(x: XmlNode): bool =
-        case x.tag
-        of "p":
-          false
-        of "span":
-          x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
-          true
-        else:
-          true
+      # context.onEnter = proc(x: XmlNode): Command =
+      #   case x.tag
+      #   of "p":
+      #     Discard
+      #   of "span":
+      #     x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
+      #     Emit
+      #   else:
+      #     Emit
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p id=remove-this>Callbacks for <span class=italic>modifying attributes</span>.</p>"

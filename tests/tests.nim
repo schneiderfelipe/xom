@@ -2,15 +2,22 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, sequtils, strformat, strutils, sugar
+import dom, htmlparser, macros, sequtils, strformat, strtabs, strutils, sugar, xmltree
+
+
+func avoidNilandPrint(context: NimNode, code: string): NimNode =
+  ## Throw `ValueError` if `context` represents `nil`, and prints the
+  ## generated code.
+  result = context
+  if result.kind == nnkNilLit:
+    raise newException(ValueError, "pure XML comments or whitespace found")
+  debugEcho &"\n\n<!-- The generated code for \"{code}\": -->\n{repr result}"
 
 
 macro html(s: string{lit}): auto =
   ## Helper for HTML parsing.
-  result = parseHtml(s.strVal).initXom()
-  if result.kind == nnkNilLit:
-    raise newException(ValueError, "pure XML comments or whitespace found")
-  debugEcho &"\n\n<!-- The generated code for \"{s.strVal}\": -->\n{repr result}"
+  let code = s.strVal
+  avoidNilandPrint(parseHtml(code).initXom(), code)
 
 
 func appendChildAndReturn(parent, child: Node): Node =
@@ -62,26 +69,26 @@ suite "Text basics":
     check x.childNodes[0].textContent == x.textContent
 
   test "can create elements containing text with entities":
-    let x = document.body.appendChildAndReturn html"<p>We support HTML entities: &lt;, &gt;, &amp;, &quot;.</p>"
+    let x = document.body.appendChildAndReturn html"<p>HTML entities: &lt;, &gt;, &amp;, &quot;.</p>"
     check x.nodeName == "P"
-    check x.textContent == "We support HTML entities: <, >, &, \"."
+    check x.textContent == "HTML entities: <, >, &, \"."
     check document.body.childNodes[7] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "We support HTML entities: <, >, &, \"."
+    check x.childNodes[0].textContent == "HTML entities: <, >, &, \"."
 
     check len(x.childNodes) == 1
 
 
 suite "Comment basics":
   test "can create elements containing text and ignored comments":
-    let x = document.body.appendChildAndReturn html"<p>We support HTML comments, <!-- not sure if it can be called 'support' then --> but they are ignored (at <strong>compile-time</strong>).</p>"
+    let x = document.body.appendChildAndReturn html"<p>HTML comments, <!-- not sure if it can be called 'support' then --> but they are ignored (at <strong>compile-time</strong>).</p>"
     check x.nodeName == "P"
-    check x.textContent == "We support HTML comments,  but they are ignored (at compile-time)."
+    check x.textContent == "HTML comments,  but they are ignored (at compile-time)."
     check document.body.childNodes[8] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "We support HTML comments, "
+    check x.childNodes[0].textContent == "HTML comments, "
 
     check x.childNodes[1].nodeName == "#text"
     check x.childNodes[1].textContent == " but they are ignored (at "
@@ -94,12 +101,45 @@ suite "Comment basics":
     check not compiles html"<!-- ceci n'est pas un commentaire ⚗️ -->"
 
 
+suite "Control basics":
+  test "can insert elements on creation or avoid creation":
+    macro html2(s: string{lit}): auto =
+      let
+        code = s.strVal
+        context = parseHtml(code).initXom()
+      context.onCreateElement = proc(x: XmlNode): bool =
+        case x.tag
+        of "p":
+          x.add newText(" when created.")
+          true
+        of "span":
+          false
+        else:
+          true
+      avoidNilandPrint(context, code)
+
+    let x = document.body.appendChildAndReturn html2"""<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"""
+    check x.nodeName == "P"
+    check x.textContent == "Callbacks for modifying elements when created."
+    check document.body.childNodes[9] == x
+
+    check x.childNodes[0].nodeName == "#text"
+    check x.childNodes[0].textContent == "Callbacks for "
+
+    check x.childNodes[1].nodeName == "STRONG"
+    check x.childNodes[1].textContent == "modifying elements"
+
+    check len(x.childNodes) == 3
+    check x.childNodes[^1].nodeName == "#text"
+    check x.childNodes[^1].textContent == " when created."
+
+
 suite "Attribute basics":
   test "can create elements with attributes":
     let x = document.body.appendChildAndReturn html"<a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a>"
     check x.nodeName == "A"
     check x.textContent == "Take a look at the project for more."
-    check document.body.childNodes[9] == x
+    check document.body.childNodes[10] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
@@ -121,7 +161,7 @@ suite "Real world cases":
     """
     check x.nodeName == "DOCUMENT"
     check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
-    check document.body.childNodes[10] == x
+    check document.body.childNodes[11] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == " "

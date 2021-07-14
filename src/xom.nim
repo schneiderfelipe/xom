@@ -1,20 +1,26 @@
 when not defined(js) and not defined(Nimdoc):
   {.error: "This module only works on the JavaScript platform".}
 
-import dom, macros, macroutils, strformat, strtabs, strutils, tables, xmltree
+import dom, macros, macroutils, strformat, strtabs, strutils, sugar,
+    tables, xmltree
 
 
 type Xom = ref object
   ## An object holding context for a conversion between `XmlNode` and
-  ## `NimNode`.
+  ## `NimNode`. It accepts some callbacks, which serve as transformers: a
+  ## `bool` returned by them specifies whether code should be generated, and
+  ## the given object can be modified prior to this generation.
   tree: XmlNode ## The XML represented by the object.
   id: CountTable[char] ## Keep track of how many elements of each type were already generated.
   buffer: string ## Buffer used during aglutination of text nodes.
+  onCreateElement*: XmlNode -> bool
+    ## Callback called when code with `createElement` is generated.
 
 
 func initXom*(x: XmlNode): Xom {.compileTime.} =
   ## Initialize a `Xom` object with a `XmlNode`.
-  Xom(tree: x)
+  result = Xom(tree: x)
+  result.onCreateElement = (_: XmlNode) => true
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -56,39 +62,39 @@ func createIdentFor(x: XmlNode, q: Xom): auto {.compileTime.} =
   q.id.inc(c)
 
 
-func toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
+proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
   ## structure as `x` by using DOM calls, and use the context of the `Xom`
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
   ## a `NimNode` representing `nil` is returned.
   if x.kind == xnElement:
-    result = superQuote do:
-      document.createElement(`x.tag`)
+    if q.onCreateElement(x):
+      result = superQuote do:
+        document.createElement(`x.tag`)
 
-    if len(x) > 0 or attrsLen(x) > 0: # or forceEntry(x):
-      let n = createIdentFor(x, q)
+      if len(x) > 0 or attrsLen(x) > 0:
+        let n = createIdentFor(x, q)
 
-      result = newStmtList quote do:
-        let `n` = `result`
+        result = newStmtList quote do:
+          let `n` = `result`
 
-      if not isNil(x.attrs):
-        for key, value in x.attrs:
-          result.add quote do:
-            `n`.setAttribute(`key`, `value`)
-
-      for xchild in x:
-        if xchild.kind == xnText:
-          q.buffer &= xchild.text
-        else:
-          flushBufferTo(result, n, q)
-          let nchild = toNimNodeImpl(xchild, q)
-          if nchild.kind != nnkNilLit:
+        if not isNil(x.attrs):
+          for key, value in x.attrs:
             result.add quote do:
-              `n`.appendChild(`nchild`)
+              `n`.setAttribute(`key`, `value`)
 
-      flushBufferTo(result, n, q)
-      # entryCallback(x, n)
-      result.add n
+        for xchild in x:
+          if xchild.kind == xnText:
+            q.buffer &= xchild.text
+          else:
+            flushBufferTo(result, n, q)
+            let nchild = toNimNodeImpl(xchild, q)
+            if nchild.kind != nnkNilLit:
+              result.add quote do:
+                `n`.appendChild(`nchild`)
+
+        flushBufferTo(result, n, q)
+        result.add n
   elif x.kind == xnText:
     result = superQuote do:
       document.createTextNode(`adjustText(x.text)`)

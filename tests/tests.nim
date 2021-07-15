@@ -9,8 +9,10 @@ func avoidNilandPrint(context: NimNode, code: string): NimNode =
   ## Throw `ValueError` if `context` represents `nil`, and prints the
   ## generated code.
   result = context
-  if result.kind == nnkNilLit:
-    raise newException(ValueError, "pure XML comments or whitespace found")
+  if result.kind == nnkNilLit or
+      result.findChild(it.kind == nnkNilLit) != nil:
+    raise newException(ValueError,
+                       "pure XML comments or whitespace found (got nil)")
   debugEcho &"\n\n<!-- The generated code for \"{code}\": -->\n{repr result}"
 
 
@@ -108,14 +110,15 @@ suite "Advanced control":
         code = s.strVal
         context = parseHtml(code).initXom()
       context.onEnter = proc(x: XmlNode): Command =
-        case x.tag
-        of "p":
-          x.add newText(" when created.")
-          Emit
-        of "span":
-          Discard
-        else:
-          Emit
+        if x.kind == xnElement:
+          case x.tag
+          of "p":
+            x.add newText(" when created.")
+          of "span":
+            return Discard
+          else:
+            discard
+        # Emit  # Already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"
@@ -138,15 +141,16 @@ suite "Advanced control":
       let
         code = s.strVal
         context = parseHtml(code).initXom()
-      # context.onEnter = proc(x: XmlNode): Command =
-      #   case x.tag
-      #   of "p":
-      #     Discard
-      #   of "span":
-      #     x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
-      #     Emit
-      #   else:
-      #     Emit
+      context.onEnter = proc(x: XmlNode): Command =
+        if x.kind == xnElement:
+          case x.tag
+          of "p":
+            x.attrs = nil
+          of "span":
+            x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
+          else:
+            discard
+        # Emit  # Already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p id=remove-this>Callbacks for <span class=italic>modifying attributes</span>.</p>"
@@ -169,16 +173,16 @@ suite "Advanced control":
 
 
   test "can modify or ignore text nodes on creation":
-    macro html2(s: string{lit}): auto =
+    macro html2(s: string{lit}): Node =
       let
         code = s.strVal
         context = parseHtml(code).initXom()
-      context.onCreateTextNode = proc(x: XmlNode): bool =
-        if "fnord" in x.text:
-          false
-        else:
+      context.onEnter = proc(x: XmlNode): Command =
+        if x.kind == xnText:
+          if "fnord" in x.text:
+            return Discard
           x.text = x.text.replace("XXX", "modifying text nodes")
-          true
+        # Emit  # Already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for XXX.<span>fnord</span></p>"

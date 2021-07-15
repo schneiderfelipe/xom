@@ -68,34 +68,34 @@ func adjustText(s: string): string {.compileTime.} =
       result &= ' '
 
 
-func flushBufferTo(stmts, n: NimNode, q: Xom) {.compileTime.} =
+func flushBufferTo(stmts, n: NimNode, context: Xom) {.compileTime.} =
   ## Flush the buffer of a `Xom` object by adding code to `result` to produce
   ## a text node attached to `n` with the buffer contents. Do nothing if the
   ## buffer is empty.
-  if len(q.buffer) > 0:
+  if len(context.buffer) > 0:
     stmts.add superQuote do:
-      `n`.appendChild(document.createTextNode(`adjustText(q.buffer)`))
-    q.buffer = ""
-    assert len(q.buffer) == 0
+      `n`.appendChild(document.createTextNode(`adjustText(context.buffer)`))
+    context.buffer = ""
+    assert len(context.buffer) == 0
 
 
-func createIdentFor(x: XmlNode, q: Xom): NimNode {.compileTime.} =
+func createIdentFor(x: XmlNode, context: Xom): NimNode {.compileTime.} =
   ## Create a cute unique identifier for an XML node in the form
   ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
   ## "`<id>`" is a an increasing number starting at zero.
   let c = x.tag[0]
-  result = ident(&"{c}{q.id[c]}")
-  q.id.inc(c)
+  result = ident(&"{c}{context.id[c]}")
+  context.id.inc(c)
 
 
-proc toNimNodeImpl(x: XmlNode, q: Xom, assigns: NimNode): NimNode {.compileTime.} =
+proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
   ## structure as `x` by using DOM calls, and use the context of the `Xom`
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
   ## a `NimNode` representing `nil` is returned.
   case x.kind:
   of xnElement:
-    let enterCommand = q.onEnter(x)
+    let enterCommand = context.onEnter(x)
     if enterCommand == Discard:
       return newNilLit()
 
@@ -103,7 +103,7 @@ proc toNimNodeImpl(x: XmlNode, q: Xom, assigns: NimNode): NimNode {.compileTime.
       document.createElement(`x.tag`)
 
     if len(x) > 0 or attrsLen(x) > 0 or enterCommand == EmitNamed:
-      let n = createIdentFor(x, q)
+      let n = createIdentFor(x, context)
       if enterCommand != EmitNamed:
         result = newStmtList quote do:
           let `n` = `result`
@@ -119,30 +119,30 @@ proc toNimNodeImpl(x: XmlNode, q: Xom, assigns: NimNode): NimNode {.compileTime.
 
       for xchild in x:
         if xchild.kind == xnText:
-          let enterCommand = q.onEnter(x)
+          let enterCommand = context.onEnter(xchild)
           if enterCommand == Discard:
             continue
 
           if enterCommand != EmitNamed:
-            q.buffer &= xchild.text
+            context.buffer &= xchild.text
           else:
-            flushBufferTo(result, n, q)
-            let t = createIdentFor(x, q)
+            flushBufferTo(result, n, context)
+            let t = createIdentFor(x, context)
             assigns.add superQuote do:
               let `t` = document.createTextNode(`adjustText(x.text)`)
             result.add quote do:
               `n`.appendChild(`t`)
         else:
-          flushBufferTo(result, n, q)
-          let nchild = toNimNodeImpl(xchild, q, assigns)
+          flushBufferTo(result, n, context)
+          let nchild = toNimNodeImpl(xchild, context, assigns)
           if nchild.kind != nnkNilLit:
             result.add quote do:
               `n`.appendChild(`nchild`)
 
-      flushBufferTo(result, n, q)
+      flushBufferTo(result, n, context)
       result.add n
   of xnText:
-    let enterCommand = q.onEnter(x)
+    let enterCommand = context.onEnter(x)
     if enterCommand == Discard:
       return newNilLit()
 
@@ -150,7 +150,7 @@ proc toNimNodeImpl(x: XmlNode, q: Xom, assigns: NimNode): NimNode {.compileTime.
       document.createTextNode(`adjustText(x.text)`)
 
     if enterCommand == EmitNamed:
-      let n = createIdentFor(x, q)
+      let n = createIdentFor(x, context)
       assigns.add quote do:
         let `n` = `result`
       result = n
@@ -168,4 +168,7 @@ converter toNimNode*(x: Xom): NimNode {.compileTime.} =
   let
     assigns = newStmtList()
     stmts = toNimNodeImpl(x.tree, x, assigns)
-  newStmtList(assigns, stmts)
+  if len(assigns) > 0:
+    newStmtList(assigns, stmts)
+  else:
+    stmts

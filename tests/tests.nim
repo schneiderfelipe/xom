@@ -14,7 +14,7 @@ func avoidNilandPrint(context: NimNode, code: string): NimNode =
   debugEcho &"\n\n<!-- The generated code for \"{code}\": -->\n{repr result}"
 
 
-macro html(s: string{lit}): auto =
+macro html(s: string{lit}): Node =
   ## Helper for HTML parsing.
   let code = s.strVal
   avoidNilandPrint(parseHtml(code).initXom(), code)
@@ -103,7 +103,7 @@ suite "Comment basics":
 
 suite "Advanced control":
   test "can insert elements on creation or avoid creation":
-    macro html2(s: string{lit}): auto =
+    macro html2(s: string{lit}): Node =
       let
         code = s.strVal
         context = parseHtml(code).initXom()
@@ -134,7 +134,7 @@ suite "Advanced control":
     check x.childNodes[^1].textContent == " when created."
 
   test "can modify or ignore attributes on being set":
-    macro html2(s: string{lit}): auto =
+    macro html2(s: string{lit}): Node =
       let
         code = s.strVal
         context = parseHtml(code).initXom()

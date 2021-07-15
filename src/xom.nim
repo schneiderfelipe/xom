@@ -79,7 +79,7 @@ func flushBufferTo(stmts, n: NimNode, q: Xom) {.compileTime.} =
     assert len(q.buffer) == 0
 
 
-func createIdentFor(x: XmlNode, q: Xom): auto {.compileTime.} =
+func createIdentFor(x: XmlNode, q: Xom): NimNode {.compileTime.} =
   ## Create a cute unique identifier for an XML node in the form
   ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
   ## "`<id>`" is a an increasing number starting at zero.
@@ -88,29 +88,29 @@ func createIdentFor(x: XmlNode, q: Xom): auto {.compileTime.} =
   q.id.inc(c)
 
 
-proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
+proc toNimNodeImpl(x: XmlNode, q: Xom, assigns: NimNode): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
   ## structure as `x` by using DOM calls, and use the context of the `Xom`
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
   ## a `NimNode` representing `nil` is returned.
   case x.kind:
-  of xnElement, xnText:
-    let command = q.onEnter(x)
-    if command == Discard:
-      return
-  else:
-    discard
-
-  case x.kind:
   of xnElement:
+    let enterCommand = q.onEnter(x)
+    if enterCommand == Discard:
+      return newNilLit()
+
     result = superQuote do:
       document.createElement(`x.tag`)
 
-    if len(x) > 0 or attrsLen(x) > 0:
+    if len(x) > 0 or attrsLen(x) > 0 or enterCommand == EmitNamed:
       let n = createIdentFor(x, q)
-
-      result = newStmtList quote do:
-        let `n` = `result`
+      if enterCommand != EmitNamed:
+        result = newStmtList quote do:
+          let `n` = `result`
+      else:
+        assigns.add quote do:
+          let `n` = `result`
+        result = newStmtList()
 
       if not isNil(x.attrs):
         for key, value in x.attrs:
@@ -119,10 +119,22 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
 
       for xchild in x:
         if xchild.kind == xnText:
-          q.buffer &= xchild.text
+          let enterCommand = q.onEnter(x)
+          if enterCommand == Discard:
+            continue
+
+          if enterCommand != EmitNamed:
+            q.buffer &= xchild.text
+          else:
+            flushBufferTo(result, n, q)
+            let t = createIdentFor(x, q)
+            assigns.add superQuote do:
+              let `t` = document.createTextNode(`adjustText(x.text)`)
+            result.add quote do:
+              `n`.appendChild(`t`)
         else:
           flushBufferTo(result, n, q)
-          let nchild = toNimNodeImpl(xchild, q)
+          let nchild = toNimNodeImpl(xchild, q, assigns)
           if nchild.kind != nnkNilLit:
             result.add quote do:
               `n`.appendChild(`nchild`)
@@ -130,10 +142,20 @@ proc toNimNodeImpl(x: XmlNode, q: Xom): NimNode {.compileTime.} =
       flushBufferTo(result, n, q)
       result.add n
   of xnText:
+    let enterCommand = q.onEnter(x)
+    if enterCommand == Discard:
+      return newNilLit()
+
     result = superQuote do:
       document.createTextNode(`adjustText(x.text)`)
+
+    if enterCommand == EmitNamed:
+      let n = createIdentFor(x, q)
+      assigns.add quote do:
+        let `n` = `result`
+      result = n
   of xnComment:
-    discard
+    return newNilLit()
   else:
     raise newException(ValueError, &"unsupported XML node type: '{x.kind}'")
 
@@ -143,4 +165,7 @@ converter toNimNode*(x: Xom): NimNode {.compileTime.} =
   ## element with the same structure as `x` by using DOM calls. HTML comments
   ## are ignored and, if the whole tree is ignored, a `NimNode` representing
   ## `nil` is returned.
-  toNimNodeImpl(x.tree, x)
+  let
+    assigns = newStmtList()
+    stmts = toNimNodeImpl(x.tree, x, assigns)
+  newStmtList(assigns, stmts)

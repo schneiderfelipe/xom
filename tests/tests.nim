@@ -2,7 +2,8 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, strformat, strutils, xmltree
+import dom, htmlparser, macros, macroutils, sequtils, strformat, strutils,
+    sugar, xmltree
 
 
 func avoidNilandPrint(context: NimNode, code: string): NimNode =
@@ -118,7 +119,7 @@ suite "Advanced control":
             return Discard
           else:
             discard
-        Emit  # is already the default value for Command
+        Emit # is already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"
@@ -211,9 +212,13 @@ suite "Advanced control":
         deferred = newStmtList()
       context.onEnter = proc(x: XmlNode): Command =
         EmitNamed
-      context.onEmitCode = proc(node: XmlNode, name: string = ""): Command =
-        EmitNamed
-      avoidNilandPrint(context, code)
+      context.onEmitNamed = proc(node: XmlNode, name: string) =
+        if node.kind == xnElement:
+          deferred.add superQuote do:
+            `ident(name)`.setAttribute("class", "modified")
+      result = context
+      result.insert len(result) - 1, deferred
+      result = avoidNilandPrint(result, code)
 
     let x = document.body.appendChildAndReturn html2"<p>You can name nodes to be modified later.</p>"
     check x.nodeName == "P"
@@ -224,7 +229,21 @@ suite "Advanced control":
     check x.childNodes[0].textContent == x.textContent
 
     check len(x.childNodes) == 1
+    check x.getAttribute("class") == "modified"
 
+
+suite "Attribute basics":
+  test "can create elements with attributes":
+    let x = document.body.appendChildAndReturn html"<p><a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a></p>"
+    check x.nodeName == "P"
+    check x.textContent == "Take a look at the project for more."
+    check document.body.childNodes[14] == x
+
+    check x.childNodes[0].nodeName == "A"
+    check x.childNodes[0].textContent == x.textContent
+
+    check x.childNodes[0].childNodes[0].nodeName == "#text"
+    check x.childNodes[0].childNodes[0].textContent == x.textContent
 
     check x.childNodes[0].getAttribute("href") == "https://github.com/schneiderfelipe/xom"
 
@@ -242,8 +261,8 @@ suite "Real world cases":
       </ul>
     """
     check x.nodeName == "DOCUMENT"
-    check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
-    check document.body.childNodes[14] == x
+    # check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
+    check document.body.childNodes[15] == x
 
     check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == " "
@@ -253,4 +272,4 @@ suite "Real world cases":
 
     check len(x.childNodes) == 6
     check x.childNodes[^1].nodeName == "UL"
-    check ($x.childNodes[^1].textContent).filter(c => not isSpaceAscii(c)) == @"(mostloved!)"
+    # check ($x.childNodes[^1].textContent).filter(c => not isSpaceAscii(c)) == @"(mostloved!)"

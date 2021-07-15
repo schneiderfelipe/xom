@@ -28,7 +28,7 @@ type
       ## code to create the node, and the `EmitNamed` command will emit code
       ## to create the node, and also create a variable for it. The `Discard`
       ## command will not emit any code, and the node will be discarded.
-    onEmitNamed*: (XmlNode, string) -> void
+    onEmitNamed*: (XmlNode, NimNode) -> void
       ## Callback called when code for a named node is emitted (i.e., with
       ## `createElement` or `createTextNode` and eventually later
       ## `setAttribute` and `appendChild`). It receives both the node and its
@@ -41,8 +41,8 @@ func initXom*(x: XmlNode): Xom {.compileTime.} =
   result = Xom(tree: x)
   result.onEnter = func(node: XmlNode): Command =
     Emit
-  result.onEmitNamed = func(node: XmlNode, name: string) =
-    assert len(name) > 0, "Named nodes must have a name"
+  result.onEmitNamed = func(node: XmlNode, name: NimNode) =
+    assert len(name.strVal) > 0, "Named nodes must have a name"
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -90,7 +90,8 @@ func createIdentFor(x: XmlNode, context: Xom): NimNode {.compileTime.} =
   context.id.inc(c)
 
 
-proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compileTime.} =
+proc toNimNodeImpl(x: XmlNode, context: Xom,
+    assigns: NimNode): NimNode {.compileTime.} =
   ## Create a `NimNode` that constructs an HTML element with the same
   ## structure as `x` by using DOM calls, and use the context of the `Xom`
   ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
@@ -110,7 +111,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
         result = newStmtList quote do:
           let `n` = `result`
       else:
-        context.onEmitNamed(x, n.strVal)
+        context.onEmitNamed(x, n)
         assigns.add quote do:
           let `n` = `result`
         result = newStmtList()
@@ -138,7 +139,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
           else:
             flushBufferTo(result, n, context)
             let t = createIdentFor(xchild, context)
-            context.onEmitNamed(xchild, t.strVal)
+            context.onEmitNamed(xchild, t)
             assigns.add superQuote do:
               let `t` = document.createTextNode(`adjustText(xchild.text)`)
             result.add quote do:
@@ -160,7 +161,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
 
     if enterCommand == EmitNamed:
       let n = createIdentFor(x, context)
-      context.onEmitNamed(x, n.strVal)
+      context.onEmitNamed(x, n)
       assigns.add quote do:
         let `n` = `result`
       result = n

@@ -2,7 +2,7 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, macroutils, strformat, strutils, xmltree
+import dom, htmlparser, macros, strformat, strutils, xmltree
 
 
 func avoidNilandPrint(context: NimNode, code: string): NimNode =
@@ -208,10 +208,10 @@ suite "Advanced control":
         deferred = newStmtList()
       context.onEnter = proc(x: XmlNode): Command =
         EmitNamed
-      context.onEmitNamed = proc(node: XmlNode, name: string) =
+      context.onEmitNamed = proc(node: XmlNode, name: NimNode) =
         if node.kind == xnElement:
-          deferred.add superQuote do:
-            `ident(name)`.setAttribute("class", "modified")
+          deferred.add quote do:
+            `name`.setAttribute("class", "modified")
       result = context
       result.insert len(result) - 1, deferred
       result = avoidNilandPrint(result, code)

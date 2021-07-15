@@ -2,7 +2,7 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, sequtils, strformat, strutils, sugar, xmltree
+import dom, htmlparser, macros, strformat, strutils, xmltree
 
 
 func avoidNilandPrint(context: NimNode, code: string): NimNode =
@@ -104,7 +104,7 @@ suite "Comment basics":
 
 
 suite "Advanced control":
-  test "can insert elements on creation or avoid creation":
+  test "can insert elements on entering or avoid creation":
     macro html2(s: string{lit}): Node =
       let
         code = s.strVal
@@ -118,7 +118,7 @@ suite "Advanced control":
             return Discard
           else:
             discard
-        # Emit  # Already the default value for Command
+        Emit  # is already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for <strong>modifying elements</strong><span>, and removing,</span></p>"
@@ -150,7 +150,7 @@ suite "Advanced control":
             x.attrs = {"style": "font-style: italic;"}.toXmlAttributes
           else:
             discard
-        # Emit  # Already the default value for Command
+        # Emit  # is already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p id=remove-this>Callbacks for <span class=italic>modifying attributes</span>.</p>"
@@ -172,7 +172,7 @@ suite "Advanced control":
     check x.childNodes[^1].textContent == "."
 
 
-  test "can modify or ignore text nodes on creation":
+  test "can modify or ignore text nodes on entering":
     macro html2(s: string{lit}): Node =
       let
         code = s.strVal
@@ -182,7 +182,7 @@ suite "Advanced control":
           if "fnord" in x.text:
             return Discard
           x.text = x.text.replace("XXX", "modifying text nodes")
-        # Emit  # Already the default value for Command
+        # Emit  # is already the default value for Command
       avoidNilandPrint(context, code)
 
     let x = document.body.appendChildAndReturn html2"<p>Callbacks for XXX.<span>fnord</span></p>"
@@ -203,18 +203,28 @@ suite "Advanced control":
     check document.body.childNodes[12] == y
 
 
-suite "Attribute basics":
-  test "can create elements with attributes":
-    let x = document.body.appendChildAndReturn html"<p><a href='https://github.com/schneiderfelipe/xom'>Take a look at the project for more.</a></p>"
+  test "can name all nodes on entering":
+    macro html2(s: string{lit}): Node =
+      let
+        code = s.strVal
+        context = parseHtml(code).initXom()
+        deferred = newStmtList()
+      context.onEnter = proc(x: XmlNode): Command =
+        EmitNamed
+      context.onEmitCode = proc(node: XmlNode, name: string = ""): Command =
+        EmitNamed
+      avoidNilandPrint(context, code)
+
+    let x = document.body.appendChildAndReturn html2"<p>You can name nodes to be modified later.</p>"
     check x.nodeName == "P"
-    check x.textContent == "Take a look at the project for more."
+    check x.textContent == "You can name nodes to be modified later."
     check document.body.childNodes[13] == x
 
-    check x.childNodes[0].nodeName == "A"
+    check x.childNodes[0].nodeName == "#text"
     check x.childNodes[0].textContent == x.textContent
 
-    check x.childNodes[0].childNodes[0].nodeName == "#text"
-    check x.childNodes[0].childNodes[0].textContent == x.textContent
+    check len(x.childNodes) == 1
+
 
     check x.childNodes[0].getAttribute("href") == "https://github.com/schneiderfelipe/xom"
 

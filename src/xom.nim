@@ -28,7 +28,7 @@ type
       ## code to create the node, and the `EmitNamed` command will emit code
       ## to create the node, and also create a variable for it. The `Discard`
       ## command will not emit any code, and the node will be discarded.
-    onEmitCode: (XmlNode, string) -> Command
+    onEmitCode*: (XmlNode, string) -> Command
       ## Callback called when code for a node is emitted (i.e., with
       ## `createElement` or `createTextNode` and eventually later
       ## `setAttribute` and `appendChild`). It receives the node as a
@@ -129,7 +129,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
             flushBufferTo(result, n, context)
             let t = createIdentFor(x, context)
             assigns.add superQuote do:
-              let `t` = document.createTextNode(`adjustText(x.text)`)
+              let `t` = document.createTextNode(`adjustText(xchild.text)`)
             result.add quote do:
               `n`.appendChild(`t`)
         else:

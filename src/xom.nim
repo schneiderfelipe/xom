@@ -43,7 +43,6 @@ func initXom*(x: XmlNode): Xom {.compileTime.} =
     Emit
   result.onEmitNamed = func(node: XmlNode, name: string) =
     assert len(name) > 0, "Named nodes must have a name"
-    discard
 
 
 func adjustText(s: string): string {.compileTime.} =
@@ -80,9 +79,10 @@ func createIdentFor(x: XmlNode, context: Xom): NimNode {.compileTime.} =
   ## Create a cute unique identifier for an XML node in the form
   ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
   ## "`<id>`" is a an increasing number starting at zero.
-  let c = if x.kind == xnElement:
+  let c = case x.kind:
+  of xnElement:
     x.tag[0]
-  elif x.kind == xnText:
+  of xnText:
     't'
   else:
     raise newException(ValueError, "unsupported XML node kind: " & $x.kind)
@@ -121,7 +121,14 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
             `n`.setAttribute(`key`, `value`)
 
       for xchild in x:
-        if xchild.kind == xnText:
+        case xchild.kind:
+        of xnElement:
+          flushBufferTo(result, n, context)
+          let nchild = toNimNodeImpl(xchild, context, assigns)
+          if nchild.kind != nnkNilLit:
+            result.add quote do:
+              `n`.appendChild(`nchild`)
+        of xnText:
           let enterCommand = context.onEnter(xchild)
           if enterCommand == Discard:
             continue
@@ -136,12 +143,10 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
               let `t` = document.createTextNode(`adjustText(xchild.text)`)
             result.add quote do:
               `n`.appendChild(`t`)
+        of xnComment:
+          continue
         else:
-          flushBufferTo(result, n, context)
-          let nchild = toNimNodeImpl(xchild, context, assigns)
-          if nchild.kind != nnkNilLit:
-            result.add quote do:
-              `n`.appendChild(`nchild`)
+          raise newException(ValueError, "unsupported XML node kind: " & $xchild.kind)
 
       flushBufferTo(result, n, context)
       result.add n

@@ -86,16 +86,13 @@ suite "Comment basics":
   test "can create elements containing text and ignored comments":
     let x = document.body.appendChildAndReturn html"<p>HTML comments, <!-- not sure if it can be called 'support' then --> but they are ignored (at <strong>compile-time</strong>).</p>"
     check x.nodeName == "P"
-    check x.textContent == "HTML comments,  but they are ignored (at compile-time)."
+    check x.textContent == "HTML comments, but they are ignored (at compile-time)."
     check document.body.childNodes[8] == x
 
     check x.childNodes[0].nodeName == "#text"
-    check x.childNodes[0].textContent == "HTML comments, "
+    check x.childNodes[0].textContent == "HTML comments, but they are ignored (at "
 
-    check x.childNodes[1].nodeName == "#text"
-    check x.childNodes[1].textContent == " but they are ignored (at "
-
-    check len(x.childNodes) == 4
+    check len(x.childNodes) == 3
     check x.childNodes[^1].nodeName == "#text"
     check x.childNodes[^1].textContent == ")."
 

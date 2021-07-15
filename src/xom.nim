@@ -1,7 +1,7 @@
 when not defined(js) and not defined(Nimdoc):
   {.error: "This module only works on the JavaScript platform".}
 
-import dom, macros, macroutils, strformat, strtabs, strutils, sugar,
+import dom, macros, macroutils, strtabs, strutils, sugar,
     tables, xmltree
 
 
@@ -42,7 +42,7 @@ func initXom*(x: XmlNode): Xom {.compileTime.} =
   result.onEnter = func(node: XmlNode): Command =
     Emit
   result.onEmitNamed = func(node: XmlNode, name: string) =
-    assert len(name) > 0 # TODO: Remove this after tests pass
+    assert len(name) > 0, "Named nodes must have a name"
     discard
 
 
@@ -73,15 +73,20 @@ func flushBufferTo(stmts, n: NimNode, context: Xom) {.compileTime.} =
     stmts.add superQuote do:
       `n`.appendChild(document.createTextNode(`adjustText(context.buffer)`))
     context.buffer = ""
-    assert len(context.buffer) == 0
+    assert len(context.buffer) == 0, "Buffer not empty after flush"
 
 
 func createIdentFor(x: XmlNode, context: Xom): NimNode {.compileTime.} =
   ## Create a cute unique identifier for an XML node in the form
   ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
   ## "`<id>`" is a an increasing number starting at zero.
-  let c = x.tag[0]
-  result = ident(&"{c}{context.id[c]}")
+  let c = if x.kind == xnElement:
+    x.tag[0]
+  elif x.kind == xnText:
+    't'
+  else:
+    raise newException(ValueError, "unsupported XML node kind: " & $x.kind)
+  result = ident(c & $context.id[c])
   context.id.inc(c)
 
 
@@ -125,7 +130,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
             context.buffer &= xchild.text
           else:
             flushBufferTo(result, n, context)
-            let t = createIdentFor(x, context) # TODO: make it xchild
+            let t = createIdentFor(xchild, context)
             context.onEmitNamed(xchild, t.strVal)
             assigns.add superQuote do:
               let `t` = document.createTextNode(`adjustText(xchild.text)`)
@@ -157,7 +162,7 @@ proc toNimNodeImpl(x: XmlNode, context: Xom, assigns: NimNode): NimNode {.compil
   of xnComment:
     return newNilLit()
   else:
-    raise newException(ValueError, &"unsupported XML node type: '{x.kind}'")
+    raise newException(ValueError, "unsupported XML node kind: " & $x.kind)
 
 
 converter toNimNode*(x: Xom): NimNode {.compileTime.} =

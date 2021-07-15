@@ -2,8 +2,7 @@ import unittest
 
 import xom
 
-import dom, htmlparser, macros, macroutils, sequtils, strformat, strutils,
-    sugar, xmltree
+import dom, htmlparser, macros, macroutils, strformat, strutils, xmltree
 
 
 func avoidNilandPrint(context: NimNode, code: string): NimNode =
@@ -261,7 +260,7 @@ suite "Real world cases":
       </ul>
     """
     check x.nodeName == "DOCUMENT"
-    # check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"
+    # check ($x.textContent).filter(c => not isSpaceAscii(c)) == @"ShowcaseFavoritefruits:(mostloved!)"  # TODO: make this work
     check document.body.childNodes[15] == x
 
     check x.childNodes[0].nodeName == "#text"
@@ -272,4 +271,4 @@ suite "Real world cases":
 
     check len(x.childNodes) == 6
     check x.childNodes[^1].nodeName == "UL"
-    # check ($x.childNodes[^1].textContent).filter(c => not isSpaceAscii(c)) == @"(mostloved!)"
+    # check ($x.childNodes[^1].textContent).filter(c => not isSpaceAscii(c)) == @"(mostloved!)"  # TODO: make this work

@@ -1,3 +1,7 @@
+<a href="http://schneiderfelipe.xyz/xom/">
+  <img alt="Documentation" src="https://img.shields.io/badge/docs-available-brightgreen"/>
+</a>
+
 # xom
 
 Transform XML trees into performant JavaScript DOM calls at *compile-time*

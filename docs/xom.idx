@@ -1,6 +1,6 @@
 Emit	xom.html#Emit	Command.Emit	
 EmitNamed	xom.html#EmitNamed	Command.EmitNamed	
-Discard	xom.html#Discard	Command.Discard	
+Skip	xom.html#Skip	Command.Skip	
 Command	xom.html#Command	xom: Command	
 Xom	xom.html#Xom	xom: Xom	
 initXom	xom.html#initXom,XmlNode	xom: initXom(tree: XmlNode): Xom	

@@ -1,10 +1,11 @@
-![hello.nim](examples/hello/hello.png)
-
 # xom
 
-Transform XML trees into JavaScript DOM calls at compile-time using Nim.
+Transform XML trees into performant JavaScript DOM calls at *compile-time*
+using Nim code.
 
-The above code will create code similar to the following:
+![hello.nim](examples/hello/hello.png)
+
+The above will compile to the following JavaScript code:
 
 ```javascript
 var p0 = document.createElement("p");
@@ -12,40 +13,33 @@ p0.appendChild(document.createTextNode("Hello!"));
 document.body.appendChild(p0);
 ```
 
-This library produces Nim code that compiles to performant JavaScript DOM
-calls.
-
 ## Customizing code generation
 
 xom can be customized to generate code that is optimized for a particular use
-case. You can modify nodes in-place, suppress code generation for certain
-nodes, force creation of referencing variables to certain nodes, and more.
+case.
+Nodes can be modified in-place, new child nodes can be created, the code
+generation can be suppressed all together for particular nodes, and variables
+are only created for nodes that you specify.
 
-This customization of the behavior is performed by the use of two callbacks:
-- `onEnter(node: XmlNode): Command`
-- `onEmitCode(node: XmlNode, name: string = ""): Command`
+All this customization is done through the use of the two simple callbacks of
+the `Xom` context object:
+- `onEnter*: XmlNode -> Command`
+- `onEmitNamed*: (XmlNode, NimNode) -> void`
 
-`onEnter` is called when a new node is found, and `onEmitCode` when code
-for a node is emitted (i.e., with `createElement` or `createTextNode` and
-eventually `setAttribute` and `appendChild`).
-Inside callbacks, you can modify nodes as much as you want.
+`onEnter` is called for every node that is found, and `onEmitNamed` is
+called for every node for which a variable has been requested.
+`onEnter` returns a `Command` object, which is an enum type that can be one of
+the following:
+- `Emit`: the node will be emitted but no variable will be created (default for
+  all nodes).
+- `EmitNamed`: the node will be emitted and a variable for it will be created. This also
+  triggers a call to `onEmitNamed` on the node.
+- `Skip`: the node will be skipped and no variable will be created.
 
-`Command` is an enum with the following values:
-- `Discard`: discard the node and its children and don't emit any code.
-- `Emit`: emit code to create the node (default behavior).
-- `EmitNamed`: emit code to create the node, and also create a variable for
-it.
+Inside both callbacks, you can modify nodes in-place, and changes will be
+reflected in the generated code *at compile-time*.
 
-**Note**: `EmitNamed` can only be (meaningfully) returned from `onEnter`:
-returning `EmitNamed` from `onEmitCode` means the same as `Emit`, since the
-decision to create a variable has already been made at that point.
 
-The default implementation of both `onEnter` and `onEmitCode` is as follows:
-
-```nim
-proc(_: XmlNode, _: string = "") =
-  Emit
-```
 
 By default, no variables are created at the toplevel (xom avoids creating
 variables and, if really needed, they are scoped by default).

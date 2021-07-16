@@ -112,7 +112,7 @@ suite "Advanced control":
           of "p":
             x.add newText(" when created.")
           of "span":
-            return Discard
+            return Skip
           else:
             discard
         Emit # is already the default value for Command
@@ -177,7 +177,7 @@ suite "Advanced control":
       context.onEnter = proc(x: XmlNode): Command =
         if x.kind == xnText:
           if "fnord" in x.text:
-            return Discard
+            return Skip
           x.text = x.text.replace("XXX", "modifying text nodes")
         # Emit  # is already the default value for Command
       avoidNilandPrint(context, code)

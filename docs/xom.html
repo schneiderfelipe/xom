@@ -103,7 +103,7 @@ window.addEventListener('DOMContentLoaded', main);
   <ul class="simple simple-toc-section">
       <li><a class="reference" href="#Command"
     title="Command = enum
-  Emit, EmitNamed, Discard">Command</a></li>
+  Emit, EmitNamed, Skip">Command</a></li>
   <li><a class="reference" href="#Xom"
     title="Xom = ref object
   tree: XmlNode
@@ -160,12 +160,12 @@ class="link-seesrc" target="_blank">Source</a>
 <dl class="item">
 <a id="Command"></a>
 <dt><pre><a href="xom.html#Command"><span class="Identifier">Command</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
-  <span class="Identifier">Emit</span><span class="Other">,</span> <span class="Identifier">EmitNamed</span><span class="Other">,</span> <span class="Identifier">Discard</span></pre></dt>
+  <span class="Identifier">Emit</span><span class="Other">,</span> <span class="Identifier">EmitNamed</span><span class="Other">,</span> <span class="Identifier">Skip</span></pre></dt>
 <dd>
 
 Return type for the <tt class="docutils literal"><span class="pre">onEnter</span></tt> callback of <tt class="docutils literal"><span class="pre">Xom</span></tt> context objects.<ul class="simple"><li><tt class="docutils literal"><span class="pre">Emit</span></tt> emits code for creating the given node (default behavior).</li>
 <li><tt class="docutils literal"><span class="pre">EmitNamed</span></tt> emits code for creating the given node and assigns it to a variable (to be passed to the <tt class="docutils literal"><span class="pre">onEmitNamed</span></tt> callback).</li>
-<li><tt class="docutils literal"><span class="pre">Discard</span></tt> does not emit code for creating the given node (or its children).</li>
+<li><tt class="docutils literal"><span class="pre">Skip</span></tt> does not emit code for creating the given node (or its children).</li>
 </ul>
 
 &nbsp;&nbsp;<a
@@ -240,7 +240,7 @@ class="link-seesrc" target="_blank">Source</a>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br/>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2021-07-16 02:24:59 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2021-07-16 14:23:59 UTC</small>
       </div>
     </div>
   </div>

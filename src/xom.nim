@@ -27,8 +27,8 @@ type
     ##
     ## - ``Emit`` emits code for creating the given node (default behavior).
     ## - ``EmitNamed`` emits code for creating the given node and assigns it to a variable (to be passed to the ``onEmitNamed`` callback).
-    ## - ``Discard`` does not emit code for creating the given node (or its children).
-    Emit, EmitNamed, Discard
+    ## - ``Skip`` does not emit code for creating the given node (or its children).
+    Emit, EmitNamed, Skip
 
   Xom* = ref object
     ## An object holding context for a conversion between ``XmlNode`` and
@@ -112,7 +112,7 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
   case node.kind:
   of xnElement:
     let enterCommand = context.onEnter(node)
-    if enterCommand == Discard:
+    if enterCommand == Skip:
       return newNilLit()
 
     let tag = node.tag
@@ -145,7 +145,7 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
               `nnode`.appendChild(`nchild`)
         of xnText:
           let enterCommand = context.onEnter(child)
-          if enterCommand == Discard:
+          if enterCommand == Skip:
             continue
 
           if enterCommand != EmitNamed:
@@ -168,7 +168,7 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
       result.add nnode
   of xnText:
     let enterCommand = context.onEnter(node)
-    if enterCommand == Discard:
+    if enterCommand == Skip:
       return newNilLit()
 
     let text = adjustText(node.text)

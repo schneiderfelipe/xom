@@ -5,3 +5,4 @@ Command	xom.html#Command	xom: Command
 Xom	xom.html#Xom	xom: Xom	
 initXom	xom.html#initXom,XmlNode	xom: initXom(tree: XmlNode): Xom	
 toNimNode	xom.html#toNimNode.c,Xom	xom: toNimNode(context: Xom): NimNode	
+Customizing code generation	xom.html#customizing-code-generation	  Customizing code generation	

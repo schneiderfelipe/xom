@@ -42,10 +42,10 @@ reflected in the generated code *at compile-time*.
 By default, no variables are created for nodes that are not requested *if not
 necessary* (and necessary but not requested variables are always scoped by
 default).
-If you want to reference a node inside `onEmitNamed`, you have to return
+If you want to reference a node inside `onEmitNamed`, you *have* to return
 `EmitNamed` from `onEnter` for that node.
 In particular, text nodes are always merged together unless a variable is
 being emitted for them.
 Having a variable for a node is useful for dinamically modifying the node in
-a separately generated code (see `examples/` and `tests/` for some simple use
+separately generated code (see `examples/` and `tests/` for some simple use
 cases).

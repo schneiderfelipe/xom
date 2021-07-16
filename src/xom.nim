@@ -1,17 +1,31 @@
-## # xom
-##
 ## Transform XML trees into performant JavaScript DOM calls at *compile-time*
 ## using Nim code.
 ##
-## ![hello.nim](examples/hello/hello.png)
+## ```nim
+## import dom, htmlparser, macros, xom
 ##
-## The above will compile to the following JavaScript code:
+## macro html(s: string{lit}): Node =
+##   parseHtml(s.strVal).initXom()
+##
+## document.body.appendChild html"<p>Hello!</p>"
+## ```
+##
+## In the usage example above, the `html` macro wrappers around the
+## `parseHtml` function from `htmlparser`, which takes a string and returns a
+## XML tree. But instead of returning the XML tree, we feed it to `initXom`,
+## which returns a `Xom` context object. The context object is then
+## (implicitly) converted into a `NimNode` object that compiles to DOM API
+## calls.
+## This particular example compiles to the following JavaScript code:
 ##
 ## ```javascript
 ## var p0 = document.createElement("p");
 ## p0.appendChild(document.createTextNode("Hello!"));
 ## document.body.appendChild(p0);
 ## ```
+##
+## You can both choose the way you generate a XML tree and customize the
+## what the `Xom` context object does behind the scenes.
 ##
 ## ## Customizing code generation
 ##
@@ -42,12 +56,12 @@
 ## By default, no variables are created for nodes that are not requested *if not
 ## necessary* (and necessary but not requested variables are always scoped by
 ## default).
-## If you want to reference a node inside `onEmitNamed`, you have to return
+## If you want to reference a node inside `onEmitNamed`, you *have* to return
 ## `EmitNamed` from `onEnter` for that node.
 ## In particular, text nodes are always merged together unless a variable is
 ## being emitted for them.
 ## Having a variable for a node is useful for dinamically modifying the node in
-## a separately generated code (see `examples/` and `tests/` for some simple use
+## separately generated code (see `examples/` and `tests/` for some simple use
 ## cases).
 
 

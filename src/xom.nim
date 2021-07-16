@@ -1,109 +1,109 @@
 when not defined(js) and not defined(Nimdoc):
   {.error: "This module only works on the JavaScript platform".}
 
-import dom, macros, macroutils, strtabs, strutils, sugar,
-    tables, xmltree
+when defined(js):
+  import dom # Required for generating the documentation.
+
+import macros, strtabs, strutils, sugar, tables, xmltree
 
 
 type
   Command* = enum
-    ## Return type for callbacks.
-    Emit,      ## Emit code to create the node (default behavior).
-    EmitNamed, ## emit code to create the node, and also create a variable
-               ## for it.
-    Discard,   ## Discard the node and its children and don't emit any code.
+    ## Return type for the ``onEnter`` callback of ``Xom`` context objects.
+    ##
+    ## - ``Emit`` emits code for creating the given node (default behavior).
+    ## - ``EmitNamed`` emits code for creating the given node and assigns it to a variable (to be passed to the ``onEmitNamed`` callback).
+    ## - ``Discard`` does not emit code for creating the given node (or its children).
+    Emit, EmitNamed, Discard
 
-  Xom = ref object
-    ## An object holding context for a conversion between `XmlNode` and
-    ## `NimNode`. It accepts some callbacks, which serve as transformers,
-    ## since the given object can be modified prior to this generation.
-    node: XmlNode ## The XML represented by the object.
-    id: CountTable[char] ## Keep track of how many elements of each type were already generated.
-    buffer: string ## Buffer used during aglutination of text nodes.
+  Xom* = ref object
+    ## An object holding context for a conversion between ``XmlNode`` and
+    ## ``NimNode``. It accepts two callbacks:
+    ##
+    ## - ``onEnter`` is called when a node has just been found. It accepts the XML node and returns a ``Command`` to be performed on it. The default behavior is to simply emit code for creating the node.
+    ## - ``onEmitNamed`` is called when code and a variable for a node is about to be emitted. It accepts the XML node and the variable (as a ``NimNode``) and returns nothing.
+    ##
+    ## Inside both callbacks, the XML nodes can be modified as desired.
+    tree: XmlNode # The XML tree represented by the object.
+    counter: CountTable[char] # A table that keeps track of variable names.
+    buffer: string # Buffer used during merging of text nodes.
     onEnter*: XmlNode -> Command
-      ## Callback called when a new node is found. It receives the node as
-      ## a parameter, and returns a command to be performed on it. The default
-      ## behavior is to emit code to create the node. The command can be
-      ## `Emit`, `EmitNamed`, or `Discard`. The `Emit` command will emit
-      ## code to create the node, and the `EmitNamed` command will emit code
-      ## to create the node, and also create a variable for it. The `Discard`
-      ## command will not emit any code, and the node will be discarded.
     onEmitNamed*: (XmlNode, NimNode) -> void
-      ## Callback called when code for a named node is emitted (i.e., with
-      ## `createElement` or `createTextNode` and eventually later
-      ## `setAttribute` and `appendChild`). It receives both the node and its
-      ## variable name as a parameter.
 
 
-func initXom*(node: XmlNode): Xom {.compileTime.} =
-  ## Initialize a `Xom` object with a `XmlNode`. Default behavior of all
-  ## callbacks is to emit code to create nodes.
-  result = Xom(node: node)
-  result.onEnter = func(node: XmlNode): Command =
-    Emit
-  result.onEmitNamed = func(node: XmlNode, name: NimNode) =
-    assert len(name.strVal) > 0, "Named nodes must have a name"
+func initXom*(tree: XmlNode): Xom {.compileTime.} =
+  ## Create a new ``Xom`` context object. The ``tree`` argument is the XML tree
+  ## to be converted. The ``onEnter`` and ``onEmitNamed`` callbacks can be
+  ## defined later.
+  Xom(
+    tree: tree,
+    onEnter: func(node: XmlNode): Command = Emit,
+    onEmitNamed: func(node: XmlNode, name: NimNode) = assert len(name.strVal) >
+        0, "Named nodes must have a name"
+  )
 
 
-func adjustText(s: string): string {.compileTime.} =
-  ## Remove whitespace from `s` as much as possible, hopefully not breaking
-  ## any HTML rule. Basically, contigous whitespace is transformed into
-  ## single `' '` characters.
-  let start = low(s)
-
-  if len(s) > 0:
-    if not s[start].isSpaceAscii:
-      result &= s[start]
+func adjustText(text: string): string {.compileTime.} =
+  ## Adjust the text to remove any doubly white space characters. This is
+  ## a helper function that ensures we emit as few text nodes as possible.
+  if len(text) > 0:
+    if not text[low(text)].isSpaceAscii:
+      result &= text[low(text)]
     else:
       result &= ' '
-
-  for i in start+1..high(s):
-    if not s[i].isSpaceAscii:
-      result &= s[i]
-    elif not s[i-1].isSpaceAscii:
+  for i in low(text)+1..high(text):
+    if not text[i].isSpaceAscii:
+      result &= text[i]
+    elif not text[i-1].isSpaceAscii:
       result &= ' '
 
 
 func flushBufferTo(stmts, nnode: NimNode, context: Xom) {.compileTime.} =
-  ## Flush the buffer of a `Xom` object by adding code to `result` to produce
-  ## a text node attached to `nnode` with the buffer contents. Do nothing if the
-  ## buffer is empty.
+  ## Flush the buffer of a ``Xom`` context object, produce the corresponding
+  ## code, insert it into the given ``stmts`` object and flush the buffer.
   if len(context.buffer) > 0:
-    stmts.add superQuote do:
-      `nnode`.appendChild(document.createTextNode(`adjustText(context.buffer)`))
+    let text = adjustText(context.buffer)
+    stmts.add quote do:
+      `nnode`.appendChild(document.createTextNode(`text`))
     context.buffer = ""
-    assert len(context.buffer) == 0, "Buffer not empty after flush"
+  assert len(context.buffer) == 0, "Buffer not empty after flush"
 
 
 func createIdentFor(node: XmlNode, context: Xom): NimNode {.compileTime.} =
-  ## Create a cute unique identifier for an XML node in the form
-  ## `"<char><id>"`, where "`<char>`" is the first letter of the tag name and
-  ## "`<id>`" is a an increasing number starting at zero.
-  let c = case node.kind:
+  ## Create a ``NimNode`` representing a unique variable identifier for the
+  ## given ``node``.
+  let letter = case node.kind:
   of xnElement:
     node.tag[0]
   of xnText:
-    't'
+    'z' # All variables starting with z represent text nodes since HTML has no tags starting with z.
   else:
     raise newException(ValueError, "unsupported XML node kind: " & $node.kind)
-  result = ident(c & $context.id[c])
-  context.id.inc(c)
+  defer:
+    context.counter.inc(letter)
+  ident(letter & $context.counter[letter])
 
 
 proc toNimNodeImpl(node: XmlNode, context: Xom,
     assigns: NimNode): NimNode {.compileTime.} =
-  ## Create a `NimNode` that constructs an HTML element with the same
-  ## structure as `x` by using DOM calls, and use the context of the `Xom`
-  ## object `q`. HTML comments are ignored and, if the whole tree is ignored,
-  ## a `NimNode` representing `nil` is returned.
+  ## Convert the given ``node`` to a ``NimNode`` using the given ``context``. The
+  ## ``assigns`` argument is used to keep track of the variables created by the
+  ## conversion.
+  ##
+  ## - If the node is a text node, the result is a call to ``createTextNode``.
+  ## - If the node is an element node, the result code produces the corresponding DOM node by calling ``createElement``, ``setAttribute``, and ``appendChild``.
+  ## - If the node is a comment node, it is ignored.
+  ##
+  ## No other node types are supported.
   case node.kind:
   of xnElement:
     let enterCommand = context.onEnter(node)
     if enterCommand == Discard:
       return newNilLit()
 
-    result = superQuote do:
-      document.createElement(`node.tag`)
+    let tag = node.tag
+    result = quote do:
+      document.createElement(`tag`)
 
     if len(node) > 0 or attrsLen(node) > 0 or enterCommand == EmitNamed:
       let nnode = createIdentFor(node, context)
@@ -138,12 +138,13 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
             context.buffer &= child.text
           else:
             flushBufferTo(result, nnode, context)
-            let text = createIdentFor(child, context)
-            context.onEmitNamed(child, text)
-            assigns.add superQuote do:
-              let `text` = document.createTextNode(`adjustText(child.text)`)
+            let ntext = createIdentFor(child, context)
+            context.onEmitNamed(child, ntext)
+            let text = adjustText(child.text)
+            assigns.add quote do:
+              let `ntext` = document.createTextNode(`text`)
             result.add quote do:
-              `nnode`.appendChild(`text`)
+              `nnode`.appendChild(`ntext`)
         of xnComment:
           continue
         else:
@@ -156,8 +157,9 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
     if enterCommand == Discard:
       return newNilLit()
 
-    result = superQuote do:
-      document.createTextNode(`adjustText(node.text)`)
+    let text = adjustText(node.text)
+    result = quote do:
+      document.createTextNode(`text`)
 
     if enterCommand == EmitNamed:
       let nnode = createIdentFor(node, context)
@@ -169,15 +171,17 @@ proc toNimNodeImpl(node: XmlNode, context: Xom,
     return newNilLit()
   else:
     raise newException(ValueError, "unsupported XML node kind: " & $node.kind)
+  assert result.kind != nnkNilLit, "nil result not explicitly returned"
 
 
-converter toNimNode(node: Xom): NimNode {.compileTime.} =
-  ## Convert a `Xom` object to a `NimNode`. This converter constructs an HTML
-  ## element with the same structure as `x` by using DOM calls. HTML comments
-  ## are ignored and, if the whole tree is ignored, a `NimNode` representing
-  ## `nil` is returned.
+converter toNimNode*(context: Xom): NimNode {.compileTime.} =
+  ## Convert the given ``context`` to a ``NimNode`` representing the root node of
+  ## the XML tree of the given ``context`` by calling the DOM API.
+  ##
+  ## HTML comments are ignored and, if the whole document is a comment, the
+  ## resulting ``NimNode`` represents ``nil``.
   let assigns = newStmtList()
-  result = toNimNodeImpl(node.node, node, assigns)
+  result = toNimNodeImpl(context.tree, context, assigns)
   if len(assigns) > 0:
     for i, assign in assigns:
       result.insert i, assign

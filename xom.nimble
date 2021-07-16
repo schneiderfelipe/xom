@@ -10,4 +10,9 @@ backend       = "js"
 # Dependencies
 
 requires "nim >= 1.2.6"
-requires "macroutils >= 1.2.0"
+
+# Tasks
+
+task docs, "Generate documentation":
+  exec "nim doc --project --index:on --git.url:https://github.com/schneiderfelipe/xom --git.commit:master --outdir:docs src/xom.nim"
+  exec "ln -s xom.html docs/index.html || true"

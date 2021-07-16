@@ -1,15 +1,8 @@
+![hello.nim](examples/hello/hello.png)
+
 # xom
 
 Transform XML trees into JavaScript DOM calls at compile-time using Nim.
-
-```nim
-import dom, htmlparser, macros, xom
-
-macro html(s: string{lit}): Node =
-  parseHtml(s.strVal).initXom()
-
-document.body.appendChild html"<p>Hello!</p>"
-```
 
 The above code will create code similar to the following:
 

@@ -2,7 +2,7 @@
 
 version       = "0.1.0"
 author        = "Felipe S. S. Schneider"
-description   = "Transform XML trees into JavaScript DOM calls at compile-time."
+description   = "Transform XML trees into performant JavaScript DOM calls at compile-time."
 license       = "MIT"
 srcDir        = "src"
 backend       = "js"

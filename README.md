@@ -32,23 +32,20 @@ called for every node for which a variable has been requested.
 the following:
 - `Emit`: the node will be emitted but no variable will be created (default for
   all nodes).
-- `EmitNamed`: the node will be emitted and a variable for it will be created. This also
-  triggers a call to `onEmitNamed` on the node.
+- `EmitNamed`: the node will be emitted and a variable for it will be
+  created. This also triggers a call to `onEmitNamed` on the node.
 - `Skip`: the node will be skipped and no variable will be created.
 
 Inside both callbacks, you can modify nodes in-place, and changes will be
 reflected in the generated code *at compile-time*.
 
-
-
-By default, no variables are created at the toplevel (xom avoids creating
-variables and, if really needed, they are scoped by default).
-You can force a node to have a variable at the toplevel of the generated code
-by returning `EmitNamed` from `onEnter`.
-Furthermore, contigous text nodes are automatically merged unless they are
-forced to be referenced by a variable.
-
-When `onEmitCode` is called, `name` is either empty or the name of an
-automatically generated variable in the emitted code.
-You can use `name` to refer to the node in custom emitted code (for example,
-to dynamically modify the node at runtime).
+By default, no variables are created for nodes that are not requested *if not
+necessary* (and necessary but not requested variables are always scoped by
+default).
+If you want to reference a node inside `onEmitNamed`, you have to return
+`EmitNamed` from `onEnter` for that node.
+In particular, text nodes are always merged together unless a variable is
+being emitted for them.
+Having a variable for a node is useful for dinamically modifying the node in
+a separately generated code (see `examples/` and `tests/` for some simple use
+cases).

@@ -2,6 +2,26 @@
 
 Transform XML trees into JavaScript DOM calls at compile-time using Nim.
 
+```nim
+import dom, htmlparser, macros, xom
+
+macro html(s: string{lit}): Node =
+  parseHtml(s.strVal).initXom()
+
+document.body.appendChild html"<p>Hello!</p>"
+```
+
+The above code will create code similar to the following:
+
+```javascript
+var p0 = document.createElement("p");
+p0.appendChild(document.createTextNode("Hello!"));
+document.body.appendChild(p0);
+```
+
+This library produces Nim code that compiles to performant JavaScript DOM
+calls.
+
 ## Customizing code generation
 
 xom can be customized to generate code that is optimized for a particular use

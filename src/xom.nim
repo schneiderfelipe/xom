@@ -1,3 +1,17 @@
+## Transform XML trees into JavaScript DOM calls at compile-time.
+##
+## .. code-block:: nim
+##    import dom, htmlparser, macros, xom
+##
+##    macro html(s: string{lit}): Node =
+##      parseHtml(s.strVal).initXom()
+##
+##    document.body.appendChild html"<p>Hello!</p>"
+##
+## This library produces Nim code that compiles to performant JavaScript DOM
+## calls.
+
+
 when not defined(js) and not defined(Nimdoc):
   {.error: "This module only works on the JavaScript platform".}
 

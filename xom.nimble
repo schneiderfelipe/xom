@@ -2,7 +2,7 @@
 
 version       = "0.1.0"
 author        = "Felipe S. S. Schneider"
-description   = "Transform XML trees into DOM calls at compile-time in Nim."
+description   = "Transform XML trees into JavaScript DOM calls at compile-time."
 license       = "MIT"
 srcDir        = "src"
 backend       = "js"

@@ -17,6 +17,12 @@ p0.appendChild(document.createTextNode("Hello!"));
 document.body.appendChild(p0);
 ```
 
+## Installation
+
+xom supports Nim 1.4.0+ and can be installed using [Nimble](https://github.com/nim-lang/Nimble):
+
+    $ nimble install xom
+
 ## Customizing code generation
 
 xom can be customized to generate code that is optimized for a particular use
